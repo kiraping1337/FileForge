@@ -43,6 +43,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddSingleton<ConversionRegistry>();
 builder.Services.AddScoped<CreateConversionService>();
+builder.Services.AddScoped<GetConversionService>();
 
 var app = builder.Build();
 

@@ -6,7 +6,8 @@ namespace FileForge.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/conversions")]
-public sealed class ConversionsController(CreateConversionService createConversion) : ControllerBase
+public sealed class ConversionsController(CreateConversionService createConversion,
+                                          GetConversionService getConversion) : ControllerBase
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -31,5 +32,17 @@ public sealed class ConversionsController(CreateConversionService createConversi
 
         return Accepted(statusUrl, new CreateConversionResponse(
             created.JobId, created.AccessToken, created.Status.ToString(), statusUrl));
+    }
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType<GetConversionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<GetConversionResponse>> Get(
+        Guid id,
+        [FromHeader(Name = "X-Job-Token")] string? token,
+        CancellationToken cancellationToken)
+    {
+        var job = await getConversion.GetAsync(id, token, cancellationToken);
+        return Ok(new GetConversionResponse(job.JobId, job.OriginalFileName, job.SourceFormat, job.TargetFormat,
+                                        job.Status, job.OutputSizeBytes, job.ErrorCode, job.CreatedAtUtc, job.ExpiresAtUtc, job.DownloadAvailable));
     }
 }
