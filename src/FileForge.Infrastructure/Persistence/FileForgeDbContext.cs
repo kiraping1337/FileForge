@@ -1,9 +1,10 @@
+using FileForge.Application.Abstractions;
 using FileForge.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace FileForge.Infrastructure.Persistence;
 
-public class FileForgeDbContext(DbContextOptions<FileForgeDbContext> options) : DbContext(options)
+public class FileForgeDbContext(DbContextOptions<FileForgeDbContext> options) : DbContext(options), IAppDbContext
 {
     public DbSet<ConversionJob> ConversionJobs => Set<ConversionJob>();
 
