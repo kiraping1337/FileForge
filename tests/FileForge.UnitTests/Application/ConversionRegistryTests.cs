@@ -9,6 +9,9 @@ public class ConversionRegistryTests
         public string Name => name;
 
         public IReadOnlyCollection<ConversionRoute> SupportedRoutes => routes;
+
+        public Task ConvertAsync(ConversionRoute route, string inputPath, string outputPath, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The registry tests never convert anything.");
     }
 
     private static ConversionRegistry CreateRegistry() =>

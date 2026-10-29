@@ -1,3 +1,5 @@
+using FileForge.Application.Errors;
+
 namespace FileForge.Application.Conversions;
 
 /// <summary>
@@ -46,4 +48,13 @@ public sealed class ConversionRegistry
 
         return _converters.ContainsKey(new ConversionRoute(sourceFormat, targetFormat));
     }
+
+    /// <summary>
+    /// The converter for a route. Throws if the route is not supported, e.g. a job created
+    /// before the configuration changed.
+    /// </summary>
+    public IFileConverter GetConverter(string sourceFormat, string targetFormat) =>
+        IsSupported(sourceFormat, targetFormat)
+            ? _converters[new ConversionRoute(sourceFormat, targetFormat)]
+            : throw new AppException(ErrorCodes.ConversionNotSupported, "This conversion is not supported.");
 }

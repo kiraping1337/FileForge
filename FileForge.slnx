@@ -3,5 +3,6 @@
   <Project Path="src/FileForge.Application/FileForge.Application.csproj" Id="4f1ec9d1-7887-42d4-a333-6998373d8a0b" />
   <Project Path="src/FileForge.Domain/FileForge.Domain.csproj" Id="6f82d3cc-6135-45b4-b972-6b494a67d038" />
   <Project Path="src/FileForge.Infrastructure/FileForge.Infrastructure.csproj" Id="0e8b47c1-7eea-4e3c-988c-4d2c9d2b7703" />
+  <Project Path="src/FileForge.Worker/FileForge.Worker.csproj" Id="eae256c9-3b96-4f4b-85f3-6362f38f56a3" />
   <Project Path="tests/FileForge.UnitTests/FileForge.UnitTests.csproj" Id="e11d5a0e-e572-40bd-82c2-fad6402f1032" />
 </Solution>

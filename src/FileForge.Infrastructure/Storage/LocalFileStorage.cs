@@ -22,7 +22,7 @@ internal sealed class LocalFileStorage : IFileStorage
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        var key = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(KeyLength / 2));
+        var key = CreateKey();
         var path = GetPath(key);
 
         try
@@ -57,6 +57,12 @@ internal sealed class LocalFileStorage : IFileStorage
             throw;
         }
     }
+
+    public string CreateKey() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(KeyLength / 2));
+
+    public string GetLocalPath(string storageKey) => GetPath(storageKey);
+
+    public long GetSize(string storageKey) => new FileInfo(GetPath(storageKey)).Length;
 
     public Stream OpenRead(string storageKey) =>
         new FileStream(GetPath(storageKey), FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
