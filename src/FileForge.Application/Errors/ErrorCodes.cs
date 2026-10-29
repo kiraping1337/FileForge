@@ -18,4 +18,5 @@ public static class ErrorCodes
     // Errors produced by the framework itself rather than by our code.
     public const string ValidationFailed = "VALIDATION_ERROR";
     public const string InternalError = "INTERNAL_ERROR";
+    public const string JobNotCompleted = "JOB_NOT_COMPLETED";
 }

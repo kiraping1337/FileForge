@@ -44,7 +44,8 @@ builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddSingleton<ConversionRegistry>();
 builder.Services.AddScoped<CreateConversionService>();
 builder.Services.AddScoped<GetConversionService>();
-
+builder.Services.AddScoped<JobAccessChecker>();
+builder.Services.AddScoped<DownloadConversionService>();
 var app = builder.Build();
 
 app.UseExceptionHandler();

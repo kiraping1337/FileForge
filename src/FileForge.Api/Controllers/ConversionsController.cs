@@ -1,13 +1,16 @@
 using FileForge.Api.Contracts;
 using FileForge.Application.Jobs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
+using System.Net.Mime;
 
 namespace FileForge.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/conversions")]
 public sealed class ConversionsController(CreateConversionService createConversion,
-                                          GetConversionService getConversion) : ControllerBase
+                                          GetConversionService getConversion,
+                                          DownloadConversionService downloadConversion) : ControllerBase
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -44,5 +47,22 @@ public sealed class ConversionsController(CreateConversionService createConversi
         var job = await getConversion.GetAsync(id, token, cancellationToken);
         return Ok(new GetConversionResponse(job.JobId, job.OriginalFileName, job.SourceFormat, job.TargetFormat,
                                         job.Status, job.OutputSizeBytes, job.ErrorCode, job.CreatedAtUtc, job.ExpiresAtUtc, job.DownloadAvailable));
+    }
+
+    [HttpGet("{id:guid}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Download(
+        Guid id,
+        [FromHeader(Name = "X-Job-Token")] string? token,
+        CancellationToken cancellationToken)
+    {
+        var file = await downloadConversion.GetAsync(id, token, cancellationToken);
+        if (!new FileExtensionContentTypeProvider().TryGetContentType(file.FileName, out var contentType))
+        {
+            contentType = "application/octet-stream";
+        }
+        return File(file.Content, contentType, file.FileName);
     }
 }
