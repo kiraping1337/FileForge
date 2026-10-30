@@ -48,6 +48,8 @@ builder.Services.AddScoped<JobAccessChecker>();
 builder.Services.AddScoped<DownloadConversionService>();
 builder.Services.AddScoped<DeleteConversionService>();
 builder.Services.AddScoped<JobFileCleaner>();
+builder.Services.AddScoped<UploadSizeLimitFilter>();
+builder.Services.AddUploadRateLimiting();
 var app = builder.Build();
 
 app.UseExceptionHandler();
@@ -59,6 +61,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.Run();

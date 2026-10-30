@@ -3,6 +3,7 @@ using FileForge.Application.Conversions;
 using FileForge.Application.Errors;
 using FileForge.Application.Storage;
 using FileForge.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace FileForge.Application.Jobs;
@@ -26,6 +27,14 @@ public sealed class CreateConversionService(
 
         var settings = options.Value;
         var target = targetFormat.Trim();
+
+        // Soft limit: the incoming size is unknown yet, so assume the maximum. Parallel uploads
+        // may overshoot the limit slightly, which is acceptable for temporary storage.
+        var usedBytes = await db.ConversionFiles.SumAsync(f => f.FileSizeBytes, cancellationToken);
+        if (usedBytes + settings.MaxFileSizeBytes > settings.MaxStorageBytes)
+        {
+            throw new AppException(ErrorCodes.StorageLimitExceeded, "The service is busy. Try again later.");
+        }
 
         var stored = await storage.SaveAsync(content, settings.MaxFileSizeBytes, cancellationToken);
 

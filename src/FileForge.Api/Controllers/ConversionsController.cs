@@ -1,8 +1,9 @@
 using FileForge.Api.Contracts;
+using FileForge.Api.Middleware;
 using FileForge.Application.Jobs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
-using System.Net.Mime;
 
 namespace FileForge.Api.Controllers;
 
@@ -15,11 +16,15 @@ public sealed class ConversionsController(CreateConversionService createConversi
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
+    [ServiceFilter(typeof(UploadSizeLimitFilter))]
+    [EnableRateLimiting(UploadRateLimiting.PolicyName)]
     [ProducesResponseType<CreateConversionResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status415UnsupportedMediaType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Create(
         [FromForm] CreateConversionRequest request,
         CancellationToken cancellationToken)
