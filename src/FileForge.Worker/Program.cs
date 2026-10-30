@@ -18,7 +18,9 @@ builder.Services.AddHostedService<ConversionWorker>();
 
 builder.Services.AddOptions<CleanupOptions>()
     .BindConfiguration(CleanupOptions.SectionName)
-    .Validate(o => o.Interval > TimeSpan.Zero && o.BatchSize > 0, "Invalid 'Cleanup' settings.")
+    .Validate(
+        o => o.Interval > TimeSpan.Zero && o.BatchSize > 0 && o.StuckJobTimeout > TimeSpan.Zero && o.MaxAttempts > 0,
+        "Invalid 'Cleanup' settings.")
     .ValidateOnStart();
 builder.Services.AddScoped<JobFileCleaner>();
 builder.Services.AddScoped<CleanupService>();

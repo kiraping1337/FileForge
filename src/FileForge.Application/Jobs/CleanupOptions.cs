@@ -14,4 +14,14 @@ public sealed class CleanupOptions
     /// a moment before its row is saved, and such a file must not be mistaken for an orphan.
     /// </summary>
     public TimeSpan OrphanFileMinAge { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// A job in Processing for longer than this is considered abandoned by a crashed worker.
+    /// Must be far longer than any converter timeout, otherwise a job still being converted
+    /// could be handed to a second worker.
+    /// </summary>
+    public TimeSpan StuckJobTimeout { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>After this many crashed attempts the job fails instead of going back to the queue.</summary>
+    public int MaxAttempts { get; set; } = 3;
 }

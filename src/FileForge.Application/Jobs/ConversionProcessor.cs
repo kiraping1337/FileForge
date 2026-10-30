@@ -57,8 +57,12 @@ public sealed class ConversionProcessor(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The worker is shutting down. The job stays in Processing; recovering such jobs is stage 3.
+            // The worker is shutting down normally: give the job back right away instead of
+            // leaving it to the stuck-job recovery.
             storage.Delete(resultKey);
+            job.ReturnToQueue();
+            await db.SaveChangesAsync(CancellationToken.None);
+            logger.LogInformation("Job {JobId} returned to the queue because the worker is stopping", job.Id);
             throw;
         }
         catch (AppException ex)

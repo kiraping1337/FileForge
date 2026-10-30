@@ -1,4 +1,5 @@
 using FileForge.Application.Abstractions;
+using FileForge.Application.Errors;
 using FileForge.Application.Storage;
 using FileForge.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.Extensions.Options;
 namespace FileForge.Application.Jobs;
 
 /// <summary>
-/// One cleanup run: files of finished and expired jobs, expired tokens, orphan files.
+/// One maintenance run: stuck jobs, files of finished and expired jobs, expired tokens, orphan files.
 /// </summary>
 public sealed class CleanupService(
     IAppDbContext db,
@@ -22,9 +23,52 @@ public sealed class CleanupService(
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        // First: a stuck job that ends up Failed gets its files removed by CleanJobsAsync in the same run.
+        await RecoverStuckJobsAsync(now, cancellationToken);
         await CleanJobsAsync(now, cancellationToken);
         await DeleteExpiredTokensAsync(now, cancellationToken);
         await DeleteOrphanFilesAsync(now, cancellationToken);
+    }
+
+    /// <summary>
+    /// A job stays in Processing forever if the worker crashed in the middle of it.
+    /// Such jobs go back to the queue, or fail once they have used up their attempts.
+    /// </summary>
+    private async Task RecoverStuckJobsAsync(DateTime now, CancellationToken cancellationToken)
+    {
+        var settings = options.Value;
+        var startedBefore = now - settings.StuckJobTimeout;
+
+        var jobs = await db.ConversionJobs
+            .Where(j => j.Status == JobStatus.Processing && j.StartedAtUtc < startedBefore)
+            .OrderBy(j => j.StartedAtUtc)
+            .Take(settings.BatchSize)
+            .ToListAsync(cancellationToken);
+
+        if (jobs.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var job in jobs)
+        {
+            if (job.AttemptCount >= settings.MaxAttempts)
+            {
+                job.Fail(ErrorCodes.ProcessingFailed, now);
+                logger.LogWarning(
+                    "Job {JobId} stuck in Processing after {AttemptCount} attempts, marked as failed",
+                    job.Id, job.AttemptCount);
+            }
+            else
+            {
+                job.ReturnToQueue();
+                logger.LogWarning(
+                    "Job {JobId} stuck in Processing, returned to the queue (attempt {AttemptCount} of {MaxAttempts})",
+                    job.Id, job.AttemptCount, settings.MaxAttempts);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task CleanJobsAsync(DateTime now, CancellationToken cancellationToken)
