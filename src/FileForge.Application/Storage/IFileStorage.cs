@@ -22,6 +22,12 @@ public interface IFileStorage
 
     Stream OpenRead(string storageKey);
 
-    /// <summary>Does nothing if the file is already gone.</summary>
+    /// <summary>
+    /// Does nothing if the file is already gone. Throws IOException if the file is in use,
+    /// e.g. being downloaded right now.
+    /// </summary>
     void Delete(string storageKey);
+
+    /// <summary>All files in the storage. Used to find orphans: files with no row in the database.</summary>
+    IEnumerable<StoredFileInfo> ListFiles();
 }

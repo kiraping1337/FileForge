@@ -12,7 +12,16 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddSingleton<ConversionRegistry>();
+
 builder.Services.AddScoped<ConversionProcessor>();
 builder.Services.AddHostedService<ConversionWorker>();
+
+builder.Services.AddOptions<CleanupOptions>()
+    .BindConfiguration(CleanupOptions.SectionName)
+    .Validate(o => o.Interval > TimeSpan.Zero && o.BatchSize > 0, "Invalid 'Cleanup' settings.")
+    .ValidateOnStart();
+builder.Services.AddScoped<JobFileCleaner>();
+builder.Services.AddScoped<CleanupService>();
+builder.Services.AddHostedService<CleanupWorker>();
 
 builder.Build().Run();

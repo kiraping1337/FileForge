@@ -42,6 +42,18 @@ public sealed class LocalFileStorageTests : IDisposable
         Assert.Empty(Directory.GetFiles(_root));
     }
 
+    [Fact]
+    public async Task ListFiles_IgnoresFilesItDidNotCreate()
+    {
+        var stored = await _storage.SaveAsync(new MemoryStream([1, 2, 3]), maxBytes: 10, CancellationToken.None);
+        await File.WriteAllTextAsync(Path.Combine(_root, "notes.txt"), "not ours");
+
+        var files = _storage.ListFiles().ToList();
+
+        var single = Assert.Single(files);
+        Assert.Equal(stored.StorageKey, single.StorageKey);
+    }
+
     [Theory]
     [InlineData("../../appsettings.json")]
     [InlineData("ABCDEF0123456789ABCDEF0123456789")] // valid length, but upper case
