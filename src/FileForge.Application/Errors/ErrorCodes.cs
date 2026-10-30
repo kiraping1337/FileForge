@@ -19,4 +19,5 @@ public static class ErrorCodes
     public const string ValidationFailed = "VALIDATION_ERROR";
     public const string InternalError = "INTERNAL_ERROR";
     public const string JobNotCompleted = "JOB_NOT_COMPLETED";
+    public const string JobInProgress = "JOB_IN_PROGRESS";
 }

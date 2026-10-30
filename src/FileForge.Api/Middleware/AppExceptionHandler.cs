@@ -50,6 +50,7 @@ internal sealed class AppExceptionHandler(
         ErrorCodes.JobExpired => StatusCodes.Status410Gone,
         ErrorCodes.StorageLimitExceeded => StatusCodes.Status503ServiceUnavailable,
         ErrorCodes.JobNotCompleted => StatusCodes.Status409Conflict,
+        ErrorCodes.JobInProgress => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest,
     };
 }

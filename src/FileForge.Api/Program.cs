@@ -46,6 +46,8 @@ builder.Services.AddScoped<CreateConversionService>();
 builder.Services.AddScoped<GetConversionService>();
 builder.Services.AddScoped<JobAccessChecker>();
 builder.Services.AddScoped<DownloadConversionService>();
+builder.Services.AddScoped<DeleteConversionService>();
+builder.Services.AddScoped<JobFileCleaner>();
 var app = builder.Build();
 
 app.UseExceptionHandler();

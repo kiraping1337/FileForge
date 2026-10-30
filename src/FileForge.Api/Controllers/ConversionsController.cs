@@ -10,7 +10,8 @@ namespace FileForge.Api.Controllers;
 [Route("api/v1/conversions")]
 public sealed class ConversionsController(CreateConversionService createConversion,
                                           GetConversionService getConversion,
-                                          DownloadConversionService downloadConversion) : ControllerBase
+                                          DownloadConversionService downloadConversion,
+                                          DeleteConversionService deleteConversion): ControllerBase
 {
     [HttpPost]
     [Consumes("multipart/form-data")]
@@ -64,5 +65,18 @@ public sealed class ConversionsController(CreateConversionService createConversi
             contentType = "application/octet-stream";
         }
         return File(file.Content, contentType, file.FileName);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromHeader(Name = "X-Job-Token")] string? token,
+        CancellationToken cancellationToken)
+    {
+        await deleteConversion.DeleteAsync(id, token, cancellationToken);
+        return NoContent();
     }
 }
