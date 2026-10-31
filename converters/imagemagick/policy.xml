@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Security policy for FileForge, based on ImageMagick's "websafe" example.
+  Deny everything, then allow only the formats FileForge supports.
+  Resource limits must fit the container limits set by the worker (memory, /tmp size).
+-->
+<policymap>
+  <!-- Resource limits. Width/height/area reject decompression bombs from the header,
+       before any pixel is decoded: a 10 KB file cannot claim to be 50000x50000. -->
+  <policy domain="resource" name="temporary-path" value="/tmp"/>
+  <policy domain="resource" name="memory" value="256MiB"/>
+  <policy domain="resource" name="map" value="256MiB"/>
+  <policy domain="resource" name="disk" value="256MiB"/>
+  <policy domain="resource" name="width" value="16KP"/>
+  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="area" value="64MP"/>
+  <policy domain="resource" name="list-length" value="32"/>
+  <policy domain="resource" name="file" value="64"/>
+  <policy domain="resource" name="thread" value="2"/>
+  <policy domain="resource" name="time" value="60"/>
+  <policy domain="system" name="max-memory-request" value="256MiB"/>
+
+  <!-- Formats: only ours. This is what blocks ImageTragick-style attacks through
+       script-like formats (MVG, MSL, SVG, PS, URL, ...). -->
+  <policy domain="module" rights="none" pattern="*"/>
+  <policy domain="module" rights="read | write" pattern="{PNG,JPEG,WEBP,BMP}"/>
+
+  <!-- No external programs (Ghostscript, curl, ...) and no filters. -->
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+
+  <!-- No reading from stdin ("-") and no file lists ("@list.txt"). -->
+  <policy domain="path" rights="none" pattern="-"/>
+  <policy domain="path" rights="none" pattern="@*"/>
+</policymap>
