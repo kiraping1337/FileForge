@@ -25,10 +25,14 @@ public static class DependencyInjection
         services.AddOptions<StorageOptions>().BindConfiguration(StorageOptions.SectionName);
         services.AddSingleton<IFileStorage, LocalFileStorage>();
 
+        services.AddOptions<SandboxOptions>().BindConfiguration(SandboxOptions.SectionName);
         services.AddOptions<ImageMagickOptions>().BindConfiguration(ImageMagickOptions.SectionName);
+        services.AddOptions<FfmpegOptions>().BindConfiguration(FfmpegOptions.SectionName);
+        services.AddSingleton<DockerSandbox>();
 
         // Each converter is registered as IFileConverter; the registry receives all of them at once.
         services.AddSingleton<IFileConverter, ImageMagickConverter>();
+        services.AddSingleton<IFileConverter, FfmpegConverter>();
         services.AddSingleton<IFormatDetector, SignatureFormatDetector>();
 
         return services;
