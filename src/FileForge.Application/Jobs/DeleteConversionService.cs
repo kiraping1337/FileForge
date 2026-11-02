@@ -7,7 +7,13 @@ namespace FileForge.Application.Jobs;
 
 public sealed class DeleteConversionService(IAppDbContext db, TimeProvider timeProvider, JobAccessChecker jobAccessChecker, JobFileCleaner fileCleaner)
 {
-    public async Task DeleteAsync(Guid id, string? token, CancellationToken cancellationToken)
+    /// <summary>
+    /// Cancels the job and deletes its files and tokens.
+    /// A job that is being converted cannot be deleted right away: only a cancellation
+    /// request is saved, and the worker finishes it within a few seconds.
+    /// </summary>
+    /// <returns>true if only cancellation was requested, false if everything was deleted.</returns>
+    public async Task<bool> DeleteAsync(Guid id, string? token, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
@@ -22,7 +28,9 @@ public sealed class DeleteConversionService(IAppDbContext db, TimeProvider timeP
         }
         if (job.Status == JobStatus.Processing)
         {
-            throw new AppException(ErrorCodes.JobInProgress, "This job is in progress");
+            job.RequestCancellation(now);
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
         }
         if (job.Status == JobStatus.Pending)
         {
@@ -37,5 +45,6 @@ public sealed class DeleteConversionService(IAppDbContext db, TimeProvider timeP
             .ToListAsync(cancellationToken);
         db.JobAccessTokens.RemoveRange(tokens);
         await db.SaveChangesAsync(cancellationToken);
+        return false;
     }
 }

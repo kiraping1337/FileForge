@@ -73,6 +73,7 @@ public sealed class ConversionsController(CreateConversionService createConversi
     }
 
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -81,7 +82,7 @@ public sealed class ConversionsController(CreateConversionService createConversi
         [FromHeader(Name = "X-Job-Token")] string? token,
         CancellationToken cancellationToken)
     {
-        await deleteConversion.DeleteAsync(id, token, cancellationToken);
-        return NoContent();
+        var cancellationPending = await deleteConversion.DeleteAsync(id, token, cancellationToken);
+        return cancellationPending ? Accepted() : NoContent();
     }
 }

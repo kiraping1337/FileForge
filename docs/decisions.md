@@ -94,9 +94,9 @@ not convert on the second try. On a normal shutdown the worker returns its curre
 - Storage quota: new uploads get `503` when stored files exceed 1 GB. A soft limit: parallel uploads
   may overshoot it slightly.
 
-**`DELETE` while processing returns 409.** Claiming "deleted" while ImageMagick is still writing the
-file would be false. Image conversion takes under a second, so the client simply retries. Real
-cancellation of a running conversion is planned for long video jobs.
+**`DELETE` never claims more than is done.** A job that is being converted is not deleted on the spot
+(see stage 4: it gets a cancellation request and `202 Accepted`). A job whose files are in use right
+now (e.g. being downloaded) gets `409`, and the client retries.
 
 **Converter sandbox.** ImageMagick runs in a one-off container per conversion
 (`converters/imagemagick`):
@@ -112,6 +112,39 @@ All flags are built in one method covered by unit tests, so none can be dropped 
 **Storage path.** `%LOCALAPPDATA%\FileForge` instead of the temp folder: on Windows the temp path may
 contain 8.3 short names that Docker cannot mount.
 
+## Stage 4 — Audio and video
+
+**One sandbox, two converters.** The `docker run` logic lives in `DockerSandbox`; ImageMagick and
+FFmpeg only provide an image and tool arguments. Each converter has its own container limits
+(FFmpeg gets more memory, CPU and time).
+
+**FFmpeg has no policy file**, so its restrictions are arguments: a forced input demuxer (`-f`) and
+`-protocol_whitelist file`. Together they block known attacks where a crafted media file makes
+FFmpeg read other local files or URLs (e.g. a playlist hidden inside a video). Only the needed
+streams are mapped; subtitles, data streams and cover art are dropped.
+
+**Container is not codec.** Each target format gets a codec its players support: H.264 + AAC for
+MP4/MOV/MKV, VP9 + Opus for WebM, LAME for MP3, Vorbis for OGG. H.264 output is always `yuv420p`:
+other pixel formats are valid but most players cannot show them. Routes are audio-to-audio and
+video-to-video only. Note: x264 is GPL-licensed; FFmpeg runs as a separate program in its own image.
+
+**Format detection** covers all 13 formats by signature: ID3 tags and MPEG frame sync bits for MP3,
+ADTS sync for AAC, `ftyp` brand for MP4 vs MOV, the EBML DocType for MKV vs WebM.
+
+**Size limits follow one setting.** `Conversions:MaxFileSizeBytes` (200 MB) drives our filter and
+ASP.NET Core's multipart limit (128 MB by default, which would otherwise reject bigger uploads with
+a generic 400). The result is capped too: FFmpeg gets `-fs 1 GB`. When the cap is hit, FFmpeg exits
+successfully with a truncated file, so the converter also checks the size and fails the job.
+
+**Timeouts are checked at startup.** The worker refuses to start unless `StuckJobTimeout` is at least
+twice the longest converter timeout; otherwise a slow conversion could be handed to a second worker.
+
+**Real cancellation.** `DELETE` on a `Processing` job only records `CancellationRequestedAtUtc` and
+answers `202 Accepted`. While converting, the worker checks that field every 2 seconds (in a separate
+`DbContext`: a context must not be used by two tasks at once), kills the container, marks the job
+`Cancelled` and deletes its files. A request that arrives just as the conversion finishes still wins.
+A stuck job with a cancellation request is cancelled instead of retried.
+
 ## Known limitations
 
 - **Docker access from the worker.** Whoever can start containers is effectively root on the host.
@@ -120,9 +153,10 @@ contain 8.3 short names that Docker cannot mount.
   internal runner service).
 - **Containers share the host kernel.** A kernel exploit could escape the sandbox. Stronger isolation
   (gVisor, microVMs) is out of scope.
-- **No optimistic concurrency.** `DELETE` of a `Pending` job can race with the worker reserving it;
-  the stuck-job recovery assumes no conversion runs longer than 10 minutes. A row version (PostgreSQL
-  `xmin`) would close both gaps.
+- **No optimistic concurrency.** `DELETE` of a `Pending` job can race with the worker reserving it,
+  and a cancellation request can arrive after the job has already completed (the job stays
+  `Completed`; a second `DELETE` removes it). A row version (PostgreSQL `xmin`) would close these gaps.
+- **Cancellation is polled**, so stopping takes up to a few seconds; LISTEN/NOTIFY could make it instant.
 - **Converter infrastructure failures** (Docker not running, image missing) mark the job `Failed`
   instead of retrying it.
 - **Client IP behind a proxy.** The rate limiter uses the connection IP; forwarded headers must be

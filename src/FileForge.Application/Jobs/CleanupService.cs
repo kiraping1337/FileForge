@@ -52,7 +52,13 @@ public sealed class CleanupService(
 
         foreach (var job in jobs)
         {
-            if (job.AttemptCount >= settings.MaxAttempts)
+            if (job.CancellationRequestedAtUtc is not null)
+            {
+                // The worker died before it could stop the job; the user wanted it stopped anyway.
+                job.Cancel(now);
+                logger.LogWarning("Job {JobId} stuck in Processing with a cancellation request, marked as cancelled", job.Id);
+            }
+            else if (job.AttemptCount >= settings.MaxAttempts)
             {
                 job.Fail(ErrorCodes.ProcessingFailed, now);
                 logger.LogWarning(
