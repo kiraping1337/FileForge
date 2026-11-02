@@ -156,6 +156,33 @@ public class ConversionJobTests
         Assert.Throws<DomainException>(() => job.AddOriginalFile("key-2", "png", Now));
     }
 
+    [Fact]
+    public void RequestCancellation_FromProcessing_RecordsTimeAndKeepsStatus()
+    {
+        var job = CreateJob();
+        job.StartProcessing(Now);
+        job.RequestCancellation(Now);
+        Assert.Equal(Now, job.CancellationRequestedAtUtc);
+        Assert.Equal(JobStatus.Processing, job.Status);
+    }
+
+    [Fact]
+    public void RequestCancellation_FromPending_Throws()
+    {
+        var job = CreateJob();
+        Assert.Throws<InvalidJobStateException>(() => job.RequestCancellation(Now));
+    }
+
+    [Fact]
+    public void RequestCancellation_Twice_KeepsFirstTime()
+    {
+        var job = CreateJob();
+        job.StartProcessing(Now);
+        job.RequestCancellation(Now);
+        job.RequestCancellation(Now.AddMinutes(1));
+        Assert.Equal(Now, job.CancellationRequestedAtUtc);
+    }
+
     [Theory]
     [InlineData(59, false)]
     [InlineData(60, true)]

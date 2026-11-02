@@ -52,6 +52,8 @@ public class ConversionJob
 
     /// <summary>How many times a worker has picked up this job. Used to cap retries.</summary>
     public int AttemptCount { get; private set; }
+    /// <summary>Set when the user asked to cancel a job that is already being converted.</summary>
+    public DateTime? CancellationRequestedAtUtc { get; private set; }
 
     public IReadOnlyCollection<ConversionFile> Files => _files;
 
@@ -171,6 +173,19 @@ public class ConversionJob
 
         Status = JobStatus.Cancelled;
         CompletedAtUtc = nowUtc;
+    }
+
+    /// <summary>
+    /// Processing -> still Processing, with a cancellation request. The worker sees the request,
+    /// stops the converter and then calls Cancel(). Repeated calls keep the first request time.
+    /// </summary>
+    public void RequestCancellation(DateTime nowUtc)
+    {
+        Guard.RequireUtc(nowUtc, nameof (nowUtc));
+        EnsureStatus(nameof(RequestCancellation), JobStatus.Processing);
+        if (CancellationRequestedAtUtc == null) { 
+            CancellationRequestedAtUtc = nowUtc;
+        }
     }
 
     /// <summary>Any finished or waiting job -> Expired. Called by the cleanup service.</summary>
