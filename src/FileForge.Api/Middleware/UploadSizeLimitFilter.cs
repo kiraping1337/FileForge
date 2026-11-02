@@ -13,7 +13,7 @@ namespace FileForge.Api.Middleware;
 internal sealed class UploadSizeLimitFilter(IOptions<ConversionOptions> options) : IResourceFilter
 {
     // Room for multipart boundaries, part headers and the targetFormat field.
-    private const long MultipartOverheadBytes = 64 * 1024;
+    internal const long MultipartOverheadBytes = 64 * 1024;
 
     public void OnResourceExecuting(ResourceExecutingContext context)
     {
@@ -39,5 +39,25 @@ internal sealed class UploadSizeLimitFilter(IOptions<ConversionOptions> options)
 
     public void OnResourceExecuted(ResourceExecutedContext context)
     {
+    }
+}
+
+public static class UploadSizeLimitExtensions
+{
+    /// <summary>
+    /// Registers the filter and makes every size limit of the upload path follow
+    /// Conversions:MaxFileSizeBytes, so changing that one setting is enough.
+    /// </summary>
+    public static IServiceCollection AddUploadSizeLimit(this IServiceCollection services)
+    {
+        services.AddScoped<UploadSizeLimitFilter>();
+
+        // ASP.NET Core has its own multipart limit (128 MB by default). Left alone, it would reject
+        // bigger uploads with a generic 400 before our code runs, whatever our setting says.
+        services.AddOptions<FormOptions>()
+            .Configure<IOptions<ConversionOptions>>((form, conversions) =>
+                form.MultipartBodyLengthLimit = conversions.Value.MaxFileSizeBytes + UploadSizeLimitFilter.MultipartOverheadBytes);
+
+        return services;
     }
 }

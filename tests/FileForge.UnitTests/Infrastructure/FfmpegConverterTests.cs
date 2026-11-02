@@ -7,8 +7,20 @@ namespace FileForge.UnitTests.Infrastructure;
 
 public sealed class FfmpegConverterTests
 {
+    private const long MaxOutputBytes = 1_000_000;
+
     private static List<string> BuildArguments(string source, string target) =>
-        FfmpegConverter.BuildToolArguments(new ConversionRoute(source, target), threads: 2).ToList();
+        FfmpegConverter.BuildToolArguments(new ConversionRoute(source, target), threads: 2, MaxOutputBytes).ToList();
+
+    [Fact]
+    public void BuildToolArguments_LimitsOutputSize()
+    {
+        var args = BuildArguments("mp3", "flac");
+
+        var index = args.IndexOf("-fs");
+        Assert.True(index > args.IndexOf("-i"), "-fs must be an output option, after -i");
+        Assert.Equal("1000000", args[index + 1]);
+    }
 
     [Theory]
     [InlineData("mp4", "mkv", "mov")]

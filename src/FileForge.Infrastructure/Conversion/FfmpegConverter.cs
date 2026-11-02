@@ -1,5 +1,6 @@
 using System.Globalization;
 using FileForge.Application.Conversions;
+using FileForge.Application.Errors;
 using Microsoft.Extensions.Options;
 
 namespace FileForge.Infrastructure.Conversion;
@@ -51,17 +52,26 @@ internal sealed class FfmpegConverter(DockerSandbox sandbox, IOptions<FfmpegOpti
     public IReadOnlyCollection<ConversionRoute> SupportedRoutes { get; } =
         AllPairs(AudioFormats).Concat(AllPairs(VideoFormats)).ToArray();
 
-    public Task ConvertAsync(
+    public async Task ConvertAsync(
         ConversionRoute route,
         string inputPath,
         string outputPath,
         CancellationToken cancellationToken)
     {
         var settings = options.Value;
-        return sandbox.RunAsync(settings, BuildToolArguments(route, settings.Threads), inputPath, outputPath, cancellationToken);
+        var arguments = BuildToolArguments(route, settings.Threads, settings.MaxOutputBytes);
+
+        await sandbox.RunAsync(settings, arguments, inputPath, outputPath, cancellationToken);
+
+        // When -fs is reached, FFmpeg stops writing and still exits with 0, leaving a truncated file
+        // slightly over the limit. A complete result is always below the limit.
+        if (new FileInfo(outputPath).Length >= settings.MaxOutputBytes)
+        {
+            throw new AppException(ErrorCodes.ProcessingFailed, "The converted file would be too large.");
+        }
     }
 
-    internal static IReadOnlyList<string> BuildToolArguments(ConversionRoute route, int threads)
+    internal static IReadOnlyList<string> BuildToolArguments(ConversionRoute route, int threads, long maxOutputBytes)
     {
         var threadCount = threads.ToString(CultureInfo.InvariantCulture);
 
@@ -83,6 +93,8 @@ internal sealed class FfmpegConverter(DockerSandbox sandbox, IOptions<FfmpegOpti
             .. streams,
             .. Codecs[route.TargetFormat],
             "-threads", threadCount,
+            // Hard cap on the result: 200 MB of compressed audio could otherwise become gigabytes of FLAC.
+            "-fs", maxOutputBytes.ToString(CultureInfo.InvariantCulture),
             "-f", Muxers[route.TargetFormat],
             "-y", DockerSandbox.OutputPath,
         ];

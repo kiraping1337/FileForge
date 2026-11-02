@@ -48,7 +48,7 @@ builder.Services.AddScoped<JobAccessChecker>();
 builder.Services.AddScoped<DownloadConversionService>();
 builder.Services.AddScoped<DeleteConversionService>();
 builder.Services.AddScoped<JobFileCleaner>();
-builder.Services.AddScoped<UploadSizeLimitFilter>();
+builder.Services.AddUploadSizeLimit();
 builder.Services.AddUploadRateLimiting();
 var app = builder.Build();
 

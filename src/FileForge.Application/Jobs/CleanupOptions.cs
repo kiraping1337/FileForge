@@ -20,7 +20,7 @@ public sealed class CleanupOptions
     /// Must be far longer than any converter timeout, otherwise a job still being converted
     /// could be handed to a second worker.
     /// </summary>
-    public TimeSpan StuckJobTimeout { get; set; } = TimeSpan.FromMinutes(30);
+    public TimeSpan StuckJobTimeout { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>After this many crashed attempts the job fails instead of going back to the queue.</summary>
     public int MaxAttempts { get; set; } = 3;
