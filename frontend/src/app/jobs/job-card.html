@@ -1,0 +1,9 @@
+<p>
+  {{ job().fileName }}: {{ job().phase }}
+  @if (job().uploadProgress !== null) {
+    ({{ job().uploadProgress }}%)
+  }
+  @if (job().errorMessage) {
+    <br />{{ job().errorMessage }}
+  }
+</p>

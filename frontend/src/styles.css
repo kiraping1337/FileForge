@@ -1,1 +1,129 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Design tokens. The idea is a forge: cool steel by default, heat only where something happens.
+ * Job states are told apart by "temperature": cold while waiting, molten while converting,
+ * quenched teal when done, crack red on failure.
+ */
+:root {
+  --steel-50: #f6f8fa;   /* raised surfaces */
+  --steel-100: #eef1f4;  /* page */
+  --steel-200: #e1e6eb;  /* pressed / sunken surfaces */
+  --steel-300: #c9d1d9;  /* lines */
+  --steel-600: #5a6773;  /* secondary text */
+  --iron-900: #1c2630;   /* text, primary buttons */
+
+  --cold-500: #5b7fa3;   /* waiting, uploading */
+  --heat-300: #ffb547;   /* white-hot */
+  --heat-500: #f2711c;   /* molten */
+  --heat-50: #fff3e6;    /* warm tint */
+  --quench-600: #0e7c6b; /* done */
+  --crack-600: #b42318;  /* failed */
+
+  --font: 'Archivo', system-ui, sans-serif;
+  --radius-small: 6px;
+  --radius-large: 14px;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--steel-100);
+  color: var(--iron-900);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--heat-500);
+  outline-offset: 2px;
+}
+
+/* Shared controls, used by several components. */
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border-radius: var(--radius-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  background: var(--iron-900);
+  color: var(--steel-50);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #2d3a47;
+}
+
+.primary-button:disabled {
+  background: var(--steel-300);
+  color: var(--steel-600);
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  border: 1px solid var(--iron-900);
+  background: transparent;
+}
+
+.secondary-button:hover {
+  background: var(--steel-200);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

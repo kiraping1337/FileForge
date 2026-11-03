@@ -1,0 +1,61 @@
+<section class="upload" aria-label="Convert a file">
+  <div
+    class="dropzone"
+    [class.dropzone--hot]="dragging()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    @if (file(); as selected) {
+      <p class="file-name">{{ selected.name }}</p>
+      <p class="file-size">{{ formatSize(selected.size) }}</p>
+      <button type="button" class="link-button" (click)="fileInput.click()">Choose another file</button>
+    } @else {
+      <p class="dropzone-title">Drop a file here</p>
+      <button type="button" class="secondary-button" (click)="fileInput.click()">Choose a file</button>
+      @if (supportedList()) {
+        <p class="dropzone-hint">Supported: {{ supportedList() }}</p>
+      }
+    }
+
+    <!-- Hidden: the button above opens it, so keyboard users get a normal, focusable control. -->
+    <input #fileInput type="file" class="visually-hidden" tabindex="-1" (change)="onFileChosen(fileInput)" />
+  </div>
+
+  @if (formatsFailed()) {
+    <p class="message message--error" role="alert">
+      Could not load the list of formats.
+      <button type="button" class="link-button" (click)="loadFormats()">Try again</button>
+    </p>
+  }
+
+  @if (file() && formats()) {
+    @if (targets().length > 0) {
+      <fieldset class="targets">
+        <legend class="targets-legend">Convert to</legend>
+        <div class="target-options">
+          @for (target of targets(); track target) {
+            <label class="target">
+              <input
+                type="radio"
+                name="target-format"
+                [value]="target"
+                [checked]="target === targetFormat()"
+                (change)="targetFormat.set(target)"
+              />
+              <span>{{ target.toUpperCase() }}</span>
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <button type="button" class="primary-button convert" [disabled]="!targetFormat()" (click)="convert()">
+        {{ convertLabel() }}
+      </button>
+    } @else {
+      <p class="message message--error" role="alert">
+        This file type is not supported. Choose a file in one of these formats: {{ supportedList() }}.
+      </p>
+    }
+  }
+</section>
