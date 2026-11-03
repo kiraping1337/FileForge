@@ -1,9 +1,53 @@
-<p>
-  {{ job().fileName }}: {{ job().phase }}
-  @if (job().uploadProgress !== null) {
-    ({{ job().uploadProgress }}%)
-  }
-  @if (job().errorMessage) {
-    <br />{{ job().errorMessage }}
-  }
-</p>
+<article class="card" [attr.data-phase]="job().phase">
+  <div class="heat" aria-hidden="true"></div>
+
+  <div class="body">
+    <div class="head">
+      <p class="name">{{ job().fileName }}</p>
+      <p class="status">{{ statusText() }}</p>
+    </div>
+
+    <p class="meta">{{ formatsText() }}, {{ formatSize(job().fileSizeBytes) }}</p>
+
+    @if (job().uploadProgress !== null) {
+      <progress
+        class="progress"
+        max="100"
+        [value]="job().uploadProgress"
+        aria-label="Upload progress"
+      ></progress>
+      <span class="percent">{{ job().uploadProgress }}%</span>
+    }
+
+    @if (job().outputSizeBytes; as size) {
+      <p class="meta">Result: {{ formatSize(size) }}</p>
+    }
+
+    @if (job().expiresAtUtc !== null && job().phase !== 'Expired') {
+      <p class="meta">Deleted at {{ job().expiresAtUtc | date: 'HH:mm' }}</p>
+    }
+
+    @if (job().errorMessage !== null) {
+      <p class="error" role="alert">{{ job().errorMessage }}</p>
+    }
+
+    @if (job().statusCheckFailed) {
+      <p class="error">Could not check the status.</p>
+      <button type="button" class="link-button" (click)="checkAgain()">Check again</button>
+    }
+
+    <div class="actions">
+      @if (job().downloadAvailable) {
+        <button type="button" class="primary-button" (click)="download()">Download</button>
+      }
+      <button
+        type="button"
+        class="secondary-button"
+        [disabled]="job().cancelling"
+        (click)="cancelOrRemove()"
+      >
+        {{ actionLabel() }}
+      </button>
+    </div>
+  </div>
+</article>
