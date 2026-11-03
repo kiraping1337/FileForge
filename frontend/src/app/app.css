@@ -1,54 +1,151 @@
-.page {
-  max-width: 44rem;
+.poster {
+  max-width: 60rem;
   margin: 0 auto;
-  padding: 3.5rem 1rem 5rem;
+  padding: 2rem 1rem 5rem;
 }
 
-.masthead {
-  margin-bottom: 2.5rem;
+.hero {
+  display: grid;
+  gap: 1.25rem;
+  padding-bottom: 1.75rem;
+  border-bottom: 2px solid var(--rule);
 }
 
-/* The one loud element: the name, set expanded and heavy like a maker's stamp on metal. */
+/* The name: the loudest thing on the page, but sized to the interface, not over it. */
 .wordmark {
-  font-size: clamp(2.75rem, 11vw, 5rem);
-  font-weight: 850;
-  font-stretch: 125%;
-  letter-spacing: -0.02em;
-  line-height: 0.95;
+  display: grid;
+  font-family: var(--font-display);
+  font-size: clamp(3.75rem, 13vw, 7.5rem);
+  font-weight: 900;
+  line-height: 0.85;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+}
+
+/* Clips only vertically (for the rise animation): a wide fallback font must not lose letters. */
+.wordmark-line {
+  display: block;
+  overflow-x: visible;
+  overflow-y: clip;
+  padding-top: 0.04em;
+}
+
+.wordmark-line > span {
+  display: block;
+  animation: rise 800ms var(--ease-out) both;
+}
+
+.wordmark-line--hot {
+  color: var(--orange);
+}
+
+.wordmark-line--hot > span {
+  animation-delay: 150ms;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+.hero-copy {
+  display: grid;
+  align-content: end;
+  gap: 0.5rem;
+  max-width: 24rem;
+  animation: appear 600ms ease 450ms both;
 }
 
 .lede {
-  max-width: 34rem;
-  margin-top: 1rem;
-  color: var(--steel-600);
   font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.hero-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
 }
 
 .jobs {
   margin-top: 3rem;
 }
 
-.jobs-heading {
-  font-size: 1.25rem;
-  font-weight: 700;
+.jobs-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--rule);
+}
+
+.jobs-heading,
+.jobs-count {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.jobs-count {
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
 }
 
 .jobs-note {
-  margin-top: 0.25rem;
-  color: var(--steel-600);
+  margin-top: 0.625rem;
+  color: var(--muted);
   font-size: 0.9375rem;
 }
 
 .job-list {
   display: grid;
   gap: 0.75rem;
-  margin: 1rem 0 0;
+  margin: 1.25rem 0 0;
   padding: 0;
   list-style: none;
 }
 
-@media (min-width: 40rem) {
-  .page {
-    padding-top: 5rem;
+/* New cards are cut in from the left; removed cards slide out and fade. */
+.job-enter {
+  animation: cut-in 450ms var(--ease-out);
+}
+
+.job-leave {
+  animation: slide-out 300ms ease-in forwards;
+}
+
+@keyframes cut-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes slide-out {
+  to {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}
+
+@media (min-width: 48rem) {
+  .poster {
+    padding-top: 3rem;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: end;
   }
 }

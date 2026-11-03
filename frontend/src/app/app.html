@@ -1,22 +1,29 @@
-<main class="page">
-  <header class="masthead">
-    <h1 class="wordmark">FileForge</h1>
-    <p class="lede">
-      Convert images, audio and video between common formats.
-      Files are kept on the server only for a short time and then deleted.
-    </p>
+<main class="poster">
+  <header class="hero">
+    <h1 class="wordmark" aria-label="FileForge">
+      <span class="wordmark-line" aria-hidden="true"><span>File</span></span>
+      <span class="wordmark-line wordmark-line--hot" aria-hidden="true"><span>Forge</span></span>
+    </h1>
+
+    <div class="hero-copy">
+      <p class="lede">Convert images, audio and video between common formats.</p>
+      <p class="hero-note">Files are kept on the server only for a short time and then deleted.</p>
+    </div>
   </header>
 
   <app-upload-panel />
 
   @if (store.jobs().length > 0) {
     <section class="jobs" aria-labelledby="jobs-heading">
-      <h2 id="jobs-heading" class="jobs-heading">Your files</h2>
+      <div class="jobs-head">
+        <h2 id="jobs-heading" class="jobs-heading">Your files</h2>
+        <span class="jobs-count">{{ store.jobs().length }}</span>
+      </div>
       <p class="jobs-note">Keep this tab open: closing it loses access to these files.</p>
 
       <ul class="job-list">
         @for (job of store.jobs(); track job.id) {
-          <li>
+          <li animate.enter="job-enter" animate.leave="job-leave">
             <app-job-card [job]="job" />
           </li>
         }

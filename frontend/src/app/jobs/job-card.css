@@ -2,133 +2,165 @@
   display: block;
 }
 
-/*
- * The strip on the left is the job's "temperature": cold while waiting,
- * molten while converting, quenched when done, cracked on failure.
- */
 .card {
   display: grid;
-  grid-template-columns: 6px 1fr;
-  overflow: hidden;
-  border: 1px solid var(--steel-300);
-  border-radius: var(--radius-large);
-  background: var(--steel-50);
+  grid-template-columns: 10px 1fr;
+  border: 2px solid var(--rule);
+  background: var(--surface);
 }
 
 .heat {
-  background: var(--steel-300);
+  background-color: var(--hairline);
+  transition: background-color var(--color-change);
 }
 
 [data-phase='Uploading'] .heat {
-  background: var(--cold-500);
+  background-color: var(--muted);
 }
 
 [data-phase='Processing'] .heat {
-  background: linear-gradient(180deg, var(--heat-300), var(--heat-500), var(--heat-300));
-  background-size: 100% 300%;
-  animation: molten 1.6s linear infinite;
+  background-image: repeating-linear-gradient(-45deg, var(--orange) 0 8px, var(--rule) 8px 16px);
+  background-size: 100% 22.6px; /* one stripe period along the bar, so the loop is seamless */
+  animation: stripes 700ms linear infinite;
 }
 
 [data-phase='Completed'] .heat {
-  background: var(--quench-600);
+  background-color: var(--rule);
 }
 
 [data-phase='Failed'] .heat {
-  background: var(--crack-600);
+  background-color: var(--red);
 }
 
-@keyframes molten {
+@keyframes stripes {
   to {
-    background-position: 0 300%;
+    background-position: 0 22.6px;
   }
 }
 
 .body {
   display: grid;
-  gap: 0.375rem;
+  gap: 0.25rem;
   min-width: 0;
-  padding: 1rem 1.25rem 1.125rem;
+  padding: 1rem 1.125rem 1.125rem;
 }
 
 .head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.25rem 1rem;
+  gap: 0.5rem 1rem;
 }
 
 .name {
   min-width: 0;
   font-weight: 700;
   overflow-wrap: anywhere;
+  transition: color var(--color-change);
 }
 
+/* Status stamp. */
 .status {
-  color: var(--steel-600);
-  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border: 2px solid var(--hairline);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-transform: uppercase;
   white-space: nowrap;
+  transition:
+    background-color var(--color-change),
+    border-color var(--color-change),
+    color var(--color-change);
 }
 
+[data-phase='Processing'] .status {
+  border-color: var(--orange);
+  background-color: var(--orange);
+  color: var(--text);
+}
+
+/* Ready and Failed are final: they get stamped on, once, when the job reaches that state. */
 [data-phase='Completed'] .status {
-  color: var(--quench-600);
+  border-color: var(--rule);
+  background-color: var(--rule);
+  color: var(--on-dark);
+  animation: stamp 500ms var(--ease-out);
 }
 
 [data-phase='Failed'] .status {
-  color: var(--crack-600);
+  border-color: var(--red);
+  background-color: var(--red);
+  color: var(--on-dark);
+  animation: stamp 500ms var(--ease-out);
 }
 
-/* Cancelled and expired jobs are cold metal: still listed, but out of the way. */
+@keyframes stamp {
+  from {
+    transform: scale(1.3) rotate(-5deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(0.97) rotate(0.5deg);
+    opacity: 1;
+  }
+}
+
 [data-phase='Cancelled'] .name,
 [data-phase='Expired'] .name {
-  color: var(--steel-600);
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
 }
 
 .meta {
-  color: var(--steel-600);
+  color: var(--muted);
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
 }
 
 .progress {
   width: 100%;
-  height: 6px;
-  margin-top: 0.25rem;
-  overflow: hidden;
+  height: 8px;
+  margin-top: 0.5rem;
   border: 0;
-  border-radius: 3px;
-  background: var(--steel-200);
+  border-radius: 0;
+  background: var(--hairline);
   appearance: none;
 }
 
 .progress::-webkit-progress-bar {
-  background: var(--steel-200);
+  background: var(--hairline);
 }
 
 .progress::-webkit-progress-value {
-  background: var(--cold-500);
-  transition: width 200ms ease;
+  background: var(--orange);
+  transition: width 300ms ease;
 }
 
 .progress::-moz-progress-bar {
-  background: var(--cold-500);
+  background: var(--orange);
 }
 
 .percent {
-  color: var(--steel-600);
-  font-size: 0.875rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .error {
-  color: var(--crack-600);
+  color: var(--red-text);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .link-button {

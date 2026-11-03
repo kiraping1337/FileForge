@@ -1,26 +1,21 @@
-/*
- * Design tokens. The idea is a forge: cool steel by default, heat only where something happens.
- * Job states are told apart by "temperature": cold while waiting, molten while converting,
- * quenched teal when done, crack red on failure.
- */
 :root {
-  --steel-50: #f6f8fa;   /* raised surfaces */
-  --steel-100: #eef1f4;  /* page */
-  --steel-200: #e1e6eb;  /* pressed / sunken surfaces */
-  --steel-300: #c9d1d9;  /* lines */
-  --steel-600: #5a6773;  /* secondary text */
-  --iron-900: #1c2630;   /* text, primary buttons */
+  --bg: #e7e6e1; /* page: concrete paper */
+  --surface: #f2f1ec; /* raised blocks */
+  --rule: #151515; /* strong black lines */
+  --hairline: #c4c3bc; /* quiet dividers */
+  --text: #151515;
+  --muted: #5c5b55; /* secondary text */
+  --on-dark: #f2f1ec; /* text on black or red */
 
-  --cold-500: #5b7fa3;   /* waiting, uploading */
-  --heat-300: #ffb547;   /* white-hot */
-  --heat-500: #f2711c;   /* molten */
-  --heat-50: #fff3e6;    /* warm tint */
-  --quench-600: #0e7c6b; /* done */
-  --crack-600: #b42318;  /* failed */
+  --orange: #ff5a1f;
+  --red: #d32f2f;
+  --red-text: #b3261e; /* red that stays readable as text on the paper */
 
-  --font: 'Archivo', system-ui, sans-serif;
-  --radius-small: 6px;
-  --radius-large: 14px;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-body: 'Archivo', system-ui, sans-serif;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --color-change: 450ms ease; /* every color change in the UI fades, never snaps */
 
   color-scheme: light;
 }
@@ -37,9 +32,9 @@ html {
 
 body {
   margin: 0;
-  background: var(--steel-100);
-  color: var(--iron-900);
-  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
   font-size: 1rem;
   line-height: 1.5;
 }
@@ -57,11 +52,16 @@ input {
 }
 
 :focus-visible {
-  outline: 3px solid var(--heat-500);
-  outline-offset: 2px;
+  outline: 3px solid var(--rule);
+  outline-offset: 3px;
 }
 
-/* Shared controls, used by several components. */
+::selection {
+  background: var(--orange);
+  color: var(--text);
+}
+
+/* Shared controls. */
 
 .primary-button,
 .secondary-button {
@@ -70,34 +70,60 @@ input {
   justify-content: center;
   min-height: 2.75rem;
   padding: 0 1.25rem;
-  border-radius: var(--radius-small);
-  font-weight: 600;
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   cursor: pointer;
+  transition:
+    background-color var(--color-change),
+    color var(--color-change),
+    border-color var(--color-change),
+    transform 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
 }
 
+/* A slab of orange with a hard black shadow; pressing pushes it into the page. */
 .primary-button {
-  border: 0;
-  background: var(--iron-900);
-  color: var(--steel-50);
+  border: 2px solid var(--rule);
+  background: var(--orange);
+  color: var(--text);
+  box-shadow: 0 0 0 var(--rule);
 }
 
 .primary-button:hover:not(:disabled) {
-  background: #2d3a47;
+  transform: translate(-3px, -3px);
+  box-shadow: 3px 3px 0 var(--rule);
+}
+
+.primary-button:active:not(:disabled) {
+  transform: translate(0, 0);
+  box-shadow: 0 0 0 var(--rule);
 }
 
 .primary-button:disabled {
-  background: var(--steel-300);
-  color: var(--steel-600);
+  border-color: var(--hairline);
+  background: transparent;
+  color: var(--muted);
   cursor: not-allowed;
 }
 
 .secondary-button {
-  border: 1px solid var(--iron-900);
+  border: 2px solid var(--rule);
   background: transparent;
 }
 
-.secondary-button:hover {
-  background: var(--steel-200);
+.secondary-button:hover:not(:disabled) {
+  background: var(--rule);
+  color: var(--on-dark);
+}
+
+.secondary-button:disabled {
+  border-color: var(--hairline);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .link-button {
@@ -105,8 +131,14 @@ input {
   border: 0;
   background: none;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
   cursor: pointer;
+  transition: text-decoration-color var(--color-change);
+}
+
+.link-button:hover {
+  text-decoration-color: var(--orange);
 }
 
 .visually-hidden {
@@ -123,6 +155,7 @@ input {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
