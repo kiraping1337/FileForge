@@ -28,7 +28,7 @@ public sealed class LocalFileStorageTests : IDisposable
         Assert.Equal(5L, stored.SizeBytes);
         await using var saved = _storage.OpenRead(stored.StorageKey);
         using var copy = new MemoryStream();
-        await saved.CopyToAsync(copy);
+        await saved.CopyToAsync(copy, TestContext.Current.CancellationToken);
         Assert.Equal(data, copy.ToArray());
     }
 
@@ -46,7 +46,7 @@ public sealed class LocalFileStorageTests : IDisposable
     public async Task ListFiles_IgnoresFilesItDidNotCreate()
     {
         var stored = await _storage.SaveAsync(new MemoryStream([1, 2, 3]), maxBytes: 10, CancellationToken.None);
-        await File.WriteAllTextAsync(Path.Combine(_root, "notes.txt"), "not ours");
+        await File.WriteAllTextAsync(Path.Combine(_root, "notes.txt"), "not ours", TestContext.Current.CancellationToken);
 
         var files = _storage.ListFiles().ToList();
 
