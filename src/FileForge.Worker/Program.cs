@@ -15,6 +15,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddSingleton<ConversionRegistry>();
 
+// In Docker the worker has no access to Docker at all: conversions go to the sandbox runner.
+// Without this setting (local development) the worker runs the sandbox itself, as before.
+var runnerUrl = builder.Configuration["Sandbox:RunnerUrl"];
+if (!string.IsNullOrWhiteSpace(runnerUrl))
+{
+    builder.Services.AddRemoteSandbox(new Uri(runnerUrl));
+}
+
 builder.Services.AddScoped<ConversionProcessor>();
 builder.Services.AddHostedService<ConversionWorker>();
 

@@ -9,11 +9,14 @@ namespace FileForge.Infrastructure.Conversion;
 /// <summary>
 /// Runs a converter in a one-off container. The container sees only the input file (read-only)
 /// and an empty output folder; everything else about the sandbox is in BuildRunArguments.
+/// Used by the sandbox runner (the only service with access to Docker) and in local development.
 /// </summary>
 internal sealed class DockerSandbox(IOptions<SandboxOptions> options, ILogger<DockerSandbox> logger)
 {
     internal const string ContainerUser = "10001";
-    internal const string InputPath = "/in/input";
+    internal const string InputDirectory = "/in";
+    internal const string InputFileName = "input";
+    internal const string InputPath = InputDirectory + "/" + InputFileName;
     internal const string OutputDirectory = "/out";
     internal const string ResultFileName = "result";
     internal const string OutputPath = OutputDirectory + "/" + ResultFileName;
@@ -32,18 +35,35 @@ internal sealed class DockerSandbox(IOptions<SandboxOptions> options, ILogger<Do
     {
         var settings = options.Value;
 
-        // A fresh empty folder per conversion: the container can write only here.
-        var workDirectory = Path.Combine(settings.WorkPath, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workDirectory);
+        // A fresh folder per conversion: "out" is the only place the container can write.
+        var workId = Guid.NewGuid().ToString("N");
+        var workDirectory = Path.Combine(settings.WorkPath, workId);
+        var outputDirectory = Path.Combine(workDirectory, "out");
+        Directory.CreateDirectory(outputDirectory);
+        AllowContainerToWrite(outputDirectory);
 
         try
         {
+            IReadOnlyList<string> mounts;
+            if (string.IsNullOrEmpty(settings.WorkVolume))
+            {
+                mounts = BindMounts(inputPath, outputDirectory);
+            }
+            else
+            {
+                // The input is copied into the work volume: the container must not see the storage volume.
+                var inputDirectory = Path.Combine(workDirectory, "in");
+                Directory.CreateDirectory(inputDirectory);
+                File.Copy(inputPath, Path.Combine(inputDirectory, InputFileName));
+                mounts = VolumeMounts(settings.WorkVolume, workId);
+            }
+
             var containerName = $"fileforge-{Guid.NewGuid():N}";
-            var arguments = BuildRunArguments(settings, container, inputPath, workDirectory, containerName, toolArguments);
+            var arguments = BuildRunArguments(settings, container, mounts, containerName, toolArguments);
 
             await RunProcessAsync(arguments, container.Timeout, containerName, cancellationToken);
 
-            File.Move(Path.Combine(workDirectory, ResultFileName), outputPath);
+            File.Move(Path.Combine(outputDirectory, ResultFileName), outputPath);
         }
         finally
         {
@@ -58,8 +78,7 @@ internal sealed class DockerSandbox(IOptions<SandboxOptions> options, ILogger<Do
     internal static IReadOnlyList<string> BuildRunArguments(
         SandboxOptions sandbox,
         ConverterContainerOptions container,
-        string inputPath,
-        string workDirectory,
+        IReadOnlyList<string> mounts,
         string containerName,
         IReadOnlyList<string> toolArguments) =>
     [
@@ -76,11 +95,42 @@ internal sealed class DockerSandbox(IOptions<SandboxOptions> options, ILogger<Do
         "--user", ContainerUser,
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
-        "--mount", $"type=bind,source={inputPath},target={InputPath},readonly",
-        "--mount", $"type=bind,source={workDirectory},target={OutputDirectory}",
+        .. mounts,
         container.Image,
         .. toolArguments,
     ];
+
+    /// <summary>Running on the host: mount the input file and the output folder directly.</summary>
+    internal static IReadOnlyList<string> BindMounts(string inputPath, string outputDirectory) =>
+    [
+        "--mount", $"type=bind,source={inputPath},target={InputPath},readonly",
+        "--mount", $"type=bind,source={outputDirectory},target={OutputDirectory}",
+    ];
+
+    /// <summary>
+    /// Running in a container: mount two sub-folders of the work volume, and nothing else of it.
+    /// volume-subpath needs Docker Engine 26 or newer.
+    /// </summary>
+    internal static IReadOnlyList<string> VolumeMounts(string volume, string workId) =>
+    [
+        "--mount", $"type=volume,source={volume},target={InputDirectory},volume-subpath={workId}/in,readonly",
+        "--mount", $"type=volume,source={volume},target={OutputDirectory},volume-subpath={workId}/out",
+    ];
+
+    /// <summary>
+    /// The converter runs as user 10001; on Linux a folder created by us is not writable for it.
+    /// The folder is new, empty and private to this one conversion, so opening it up is safe.
+    /// </summary>
+    private static void AllowContainerToWrite(string directory)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(directory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+        }
+    }
 
     private async Task RunProcessAsync(
         IReadOnlyList<string> arguments,

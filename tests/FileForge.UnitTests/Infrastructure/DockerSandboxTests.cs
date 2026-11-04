@@ -8,8 +8,7 @@ public sealed class DockerSandboxTests
         DockerSandbox.BuildRunArguments(
             new SandboxOptions(),
             new ImageMagickOptions(),
-            "C:\\storage\\input",
-            "C:\\work\\abc",
+            DockerSandbox.BindMounts("C:\\storage\\input", "C:\\work\\abc\\out"),
             "fileforge-test",
             ["tool-arg-1", "tool-arg-2"]);
 
@@ -64,5 +63,27 @@ public sealed class DockerSandboxTests
 
         var i = args.ToList().IndexOf(flag);
         Assert.Equal(expectedValue, args[i + 1]);
+    }
+
+    [Fact]
+    public void VolumeMounts_InputIsReadOnly_OutputIsNot()
+    {
+        var mounts = DockerSandbox.VolumeMounts("fileforge-work", "abc123");
+
+        var input = mounts.Single(m => m.Contains("target=/in,"));
+        var output = mounts.Single(m => m.Contains("target=/out,"));
+        Assert.EndsWith("readonly", input);
+        Assert.DoesNotContain("readonly", output);
+    }
+
+    [Fact]
+    public void VolumeMounts_ExposeOnlyThisConversionsFolders()
+    {
+        var mounts = DockerSandbox.VolumeMounts("fileforge-work", "abc123");
+
+        // Every mount is a sub-folder of this one conversion, never the whole volume.
+        Assert.All(
+            mounts.Where(m => m.StartsWith("type=volume")),
+            m => Assert.Contains("volume-subpath=abc123/", m));
     }
 }

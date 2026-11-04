@@ -3,6 +3,7 @@ using FileForge.Application.Conversions;
 using FileForge.Application.Errors;
 using FileForge.Application.Jobs;
 using FileForge.Infrastructure;
+using FileForge.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,13 @@ builder.Services.AddScoped<JobFileCleaner>();
 builder.Services.AddUploadSizeLimit();
 builder.Services.AddUploadRateLimiting();
 var app = builder.Build();
+
+// `dotnet FileForge.Api.dll --migrate`: apply migrations and exit. Used by the "migrate" service in Docker Compose.
+if (args.Contains("--migrate"))
+{
+    await app.Services.MigrateDatabaseAsync();
+    return;
+}
 
 app.UseExceptionHandler();
 

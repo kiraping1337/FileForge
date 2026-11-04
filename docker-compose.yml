@@ -1,3 +1,16 @@
+# The whole FileForge: `docker compose up --build`, then open http://localhost:8080
+#
+# Who can talk to whom:
+#   browser -> web (nginx) -> api -> postgres
+#                              worker -> postgres, sandbox-runner
+#                                        sandbox-runner -> Docker (starts converter containers)
+# Only `web` (and postgres, for pgAdmin) publish ports, and only on 127.0.0.1 by default.
+
+name: fileforge
+
+x-database-connection: &database-connection
+  ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-fileforge};Username=${POSTGRES_USER:-fileforge};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}"
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -6,11 +19,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-fileforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}
     ports:
-      # 127.0.0.1 = reachable only from this computer, not from the local network.
-      # 5433 on the host avoids a clash with a locally installed PostgreSQL on 5432.
+      # For pgAdmin on this computer only. 5433 avoids a clash with a locally installed PostgreSQL.
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -18,5 +31,127 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Applies EF Core migrations once and exits. The API and the worker start only after it
+  # succeeded, so two processes never migrate the same database at the same time.
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+      target: api
+    image: fileforge-api:local
+    command: ["--migrate"]
+    environment:
+      <<: *database-connection
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+      target: api
+    image: fileforge-api:local
+    environment:
+      <<: *database-connection
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      Storage__RootPath: /data/storage
+    volumes:
+      - storage:/data/storage
+    networks: [backend, frontend]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+      target: worker
+    image: fileforge-worker:local
+    environment:
+      <<: *database-connection
+      DOTNET_ENVIRONMENT: Production
+      Storage__RootPath: /data/storage
+      Sandbox__RunnerUrl: http://sandbox-runner:8080/
+    volumes:
+      - storage:/data/storage
+    # No Docker socket here: conversions are requested from the sandbox runner.
+    networks: [backend, sandbox]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      sandbox-runner:
+        condition: service_started
+    restart: unless-stopped
+
+  sandbox-runner:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+      target: runner
+    image: fileforge-sandbox-runner:local
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Storage__RootPath: /data/storage
+      Sandbox__WorkPath: /data/work
+      Sandbox__WorkVolume: fileforge-work
+    volumes:
+      - storage:/data/storage
+      - work:/data/work
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Reachable only from the worker; no database, no published port.
+    networks: [sandbox]
+    depends_on:
+      imagemagick-image:
+        condition: service_completed_successfully
+      ffmpeg-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # These two only build the converter images (the runner starts containers from them),
+  # print the tool version and exit.
+  imagemagick-image:
+    build: converters/imagemagick
+    image: fileforge-imagemagick:1
+    command: ["-version"]
+    network_mode: none
+    restart: "no"
+
+  ffmpeg-image:
+    build: converters/ffmpeg
+    image: fileforge-ffmpeg:1
+    command: ["-hide_banner", "-version"]
+    network_mode: none
+    restart: "no"
+
+  web:
+    build: frontend
+    image: fileforge-web:local
+    ports:
+      # 127.0.0.1 = this computer only. Set WEB_BIND=0.0.0.0 in .env to open it to the local network.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+networks:
+  frontend:
+  # internal: no route to the internet. The database, API-worker traffic and the runner stay inside.
+  backend:
+    internal: true
+  sandbox:
+    internal: true
+
 volumes:
   postgres-data:
+  storage:
+  # Fixed name: the runner passes it to `docker run`, and Compose would otherwise prefix it.
+  work:
+    name: fileforge-work

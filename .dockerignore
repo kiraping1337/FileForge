@@ -1,0 +1,10 @@
+# Keeps the build context small and free of local files (secrets, build output).
+.git
+.vs
+.vscode
+**/bin
+**/obj
+**/.env
+frontend
+tests
+docs

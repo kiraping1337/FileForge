@@ -18,7 +18,7 @@ public sealed class ConversionProcessor(
     IAppDbContext db,
     IJobQueue queue,
     IFileStorage storage,
-    ConversionRegistry registry,
+    IConversionExecutor executor,
     JobFileCleaner fileCleaner,
     IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
@@ -55,12 +55,10 @@ public sealed class ConversionProcessor(
 
         try
         {
-            var converter = registry.GetConverter(job.SourceFormat, job.TargetFormat);
-
-            await converter.ConvertAsync(
+            await executor.ExecuteAsync(
                 new ConversionRoute(job.SourceFormat, job.TargetFormat),
-                storage.GetLocalPath(original.StorageKey),
-                storage.GetLocalPath(resultKey),
+                original.StorageKey,
+                resultKey,
                 conversion.Token);
 
             // A request that arrived just as the conversion finished still wins:
