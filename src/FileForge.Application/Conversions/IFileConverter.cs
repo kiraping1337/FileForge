@@ -1,8 +1,5 @@
 namespace FileForge.Application.Conversions;
 
-/// <summary>
-/// An external tool that converts files (ImageMagick, FFmpeg).
-/// </summary>
 public interface IFileConverter
 {
     string Name { get; }

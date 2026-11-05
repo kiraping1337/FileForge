@@ -2,9 +2,6 @@ using FileForge.Domain.Exceptions;
 
 namespace FileForge.Domain;
 
-/// <summary>
-/// Small argument checks shared by the domain entities.
-/// </summary>
 internal static class Guard
 {
     public static void RequireText(string? value, int maxLength, string paramName)

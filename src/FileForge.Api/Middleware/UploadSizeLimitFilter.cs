@@ -52,8 +52,8 @@ public static class UploadSizeLimitExtensions
     {
         services.AddScoped<UploadSizeLimitFilter>();
 
-        // ASP.NET Core has its own multipart limit (128 MB by default). Left alone, it would reject
-        // bigger uploads with a generic 400 before our code runs, whatever our setting says.
+        // ASP.NET Core's default multipart limit is 128 MB, below our 200 MB: left alone, it would
+        // reject bigger uploads with a generic 400 before our own check runs.
         services.AddOptions<FormOptions>()
             .Configure<IOptions<ConversionOptions>>((form, conversions) =>
                 form.MultipartBodyLengthLimit = conversions.Value.MaxFileSizeBytes + UploadSizeLimitFilter.MultipartOverheadBytes);

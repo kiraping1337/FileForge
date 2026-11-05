@@ -16,9 +16,8 @@ public sealed class CleanupOptions
     public TimeSpan OrphanFileMinAge { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>
-    /// A job in Processing for longer than this is considered abandoned by a crashed worker.
-    /// Must be far longer than any converter timeout, otherwise a job still being converted
-    /// could be handed to a second worker.
+    /// A job in Processing for longer than this is treated as abandoned by a crashed worker.
+    /// Must be far longer than any converter timeout, or a second worker could take the job.
     /// </summary>
     public TimeSpan StuckJobTimeout { get; set; } = TimeSpan.FromHours(1);
 

@@ -15,11 +15,9 @@ public sealed class SandboxOptions
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileForge", "work");
 
     /// <summary>
-    /// Empty (default): converter containers bind-mount folders of this machine. Used when the code
-    /// runs directly on the host (local development).
-    /// Set to a Docker volume name when the code itself runs in a container (the sandbox runner):
-    /// paths inside our container mean nothing to the host's Docker, so converter containers get
-    /// sub-folders of this volume instead. WorkPath must then be where the volume is mounted.
+    /// Empty (default): converter containers bind-mount folders of this machine, used when the code
+    /// runs on the host. Set to a Docker volume name when the code runs in a container: paths inside
+    /// our container mean nothing to the host's Docker. WorkPath must then be where the volume is mounted.
     /// </summary>
     public string? WorkVolume { get; set; }
 

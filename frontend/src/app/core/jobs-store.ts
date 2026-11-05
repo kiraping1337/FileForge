@@ -34,9 +34,9 @@ export interface JobView {
 }
 
 /**
- * Holds the jobs of this browser tab and talks to the API about them.
- * Access tokens live only in memory (never localStorage): a page reload forgets the jobs,
- * which is acceptable for files that are deleted within an hour anyway.
+ * Holds the jobs of this browser tab and talks to the API about them. Access tokens live only
+ * in memory (never localStorage): a reload forgets the jobs, which is fine for files that are
+ * deleted within an hour anyway.
  */
 @Injectable({ providedIn: 'root' })
 export class JobsStore {
@@ -174,8 +174,8 @@ export class JobsStore {
 
     this.subscriptions.get(id)?.unsubscribe();
 
-    // The next request starts 2 s after the previous answer, never earlier: on a slow network
-    // requests never overlap and none is cancelled half-way.
+    // repeat({ delay }), not a timer + switchMap: the next request starts 2 s after the previous
+    // answer. A timer would cancel a slow request, and that status would never arrive.
     const polling = this.api
       .getStatus(serverId, token)
       .pipe(

@@ -7,9 +7,8 @@ using Microsoft.Extensions.Options;
 namespace FileForge.Infrastructure.Conversion;
 
 /// <summary>
-/// Runs a converter in a one-off container. The container sees only the input file (read-only)
-/// and an empty output folder; everything else about the sandbox is in BuildRunArguments.
-/// Used by the sandbox runner (the only service with access to Docker) and in local development.
+/// Runs a converter in a one-off container: it sees only the input file (read-only) and an empty
+/// output folder; every other restriction is in BuildRunArguments.
 /// </summary>
 internal sealed class DockerSandbox(IOptions<SandboxOptions> options, ILogger<DockerSandbox> logger)
 {

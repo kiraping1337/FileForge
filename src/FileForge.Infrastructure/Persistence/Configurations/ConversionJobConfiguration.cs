@@ -9,7 +9,7 @@ public class ConversionJobConfiguration : IEntityTypeConfiguration<ConversionJob
 {
     public void Configure(EntityTypeBuilder<ConversionJob> builder)
     {
-        //Built from the enum so the constraint stays in sync with the code.
+        // Built from the enum so the constraint stays in sync with the code.
         var statuses = string.Join(", ", Enum.GetNames<JobStatus>().Select(s => $"'{s}'"));
 
         builder.ToTable("ConversionJobs", table =>
@@ -26,10 +26,10 @@ public class ConversionJobConfiguration : IEntityTypeConfiguration<ConversionJob
 
         builder.HasKey(j => j.Id);
 
-        //Ids are generated in code; without this EF would treat a new entity with a set id as existing.
+        // Ids are generated in code; without this EF would treat a new entity with a set id as existing.
         builder.Property(j => j.Id).ValueGeneratedNever();
 
-        //Text instead of int: readable in SQL and safe if enum members are reordered.
+        // Text instead of int: readable in SQL and safe if enum members are reordered.
         builder.Property(j => j.Status)
             .HasConversion<string>()
             .HasMaxLength(16)

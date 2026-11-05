@@ -30,7 +30,7 @@ public class ConversionFileConfiguration : IEntityTypeConfiguration<ConversionFi
 
         builder.HasIndex(f => f.StorageKey).IsUnique();
 
-        //Also covers lookups by JobId alone (leftmost prefix), so no separate JobId index is needed.
+        // Also covers lookups by JobId alone (leftmost prefix), so no separate JobId index is needed.
         builder.HasIndex(f => new { f.JobId, f.Role }).IsUnique();
     }
 }

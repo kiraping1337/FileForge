@@ -4,9 +4,8 @@ using FileForge.Domain.Exceptions;
 namespace FileForge.Domain.Entities;
 
 /// <summary>
-/// One conversion request: a single source file converted to a single target format.
-/// Properties have private setters, so the status can only change through the methods
-/// below. That makes invalid transitions (e.g. Pending -> Completed) impossible.
+/// One conversion request: one source file converted to one target format. The status can only
+/// change through the methods below (private setters), so invalid transitions are impossible.
 /// </summary>
 public class ConversionJob
 {
