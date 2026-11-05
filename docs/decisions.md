@@ -1,163 +1,115 @@
 # Architecture decisions
 
-Short log of decisions and trade-offs, grouped by stage. Each entry: what was chosen and why.
+The main design choices, the alternatives that were rejected, and the cost of each choice.
 Known limitations are listed at the end.
 
-## Stage 1 — Foundation
+## Structure
 
-**Projects.** `Domain`, `Application`, `Infrastructure`, `Api`, `Worker` and a unit test project.
-Dependencies point inwards: `Domain` knows nothing; `Application` knows `Domain`; `Infrastructure`
-implements `Application` interfaces; `Api` and `Worker` wire everything together. Projects were added
-only when they had real code.
+**Layers.** `Domain` → `Application` → `Infrastructure`; `Api`, `Worker` and `SandboxRunner` are entry
+points that wire everything together. Dependencies point inwards, so business rules do not depend on
+EF Core, Docker or HTTP.
 
-**Rich domain entities.** Entity properties have private setters; status changes only through methods
-(`StartProcessing`, `Complete`, `Fail`, `Cancel`, `Expire`, `ReturnToQueue`). Each method checks the
-current status, so an invalid transition throws `InvalidJobStateException` instead of corrupting data.
-
-**Ids generated in code.** `Guid.CreateVersion7()` (time-ordered, keeps the primary key index compact).
-Columns use `ValueGeneratedNever()`, so EF treats a new object with an id as a new row.
-
-**Enums stored as text** with a CHECK constraint built from the enum names. Readable in SQL and safe
-against reordering enum members.
-
-**Times are UTC `DateTime`** (`timestamp with time zone`). Entities reject non-UTC values. The current
-time comes from an injected `TimeProvider`, so tests can control it.
-
-**Delete behaviour.** `ConversionFiles` → `Restrict`: a file row must not disappear while the physical
-file may still exist. `JobAccessTokens` → `Cascade`: a token has no physical resource behind it.
-
-**Local secrets.** No connection string in `appsettings.json`: user-secrets locally, environment
-variables in Docker. PostgreSQL listens on `127.0.0.1:5433` to avoid clashing with a local install.
-
-## Stage 2 — First working flow
-
-**Conversion registry.** Each converter declares its routes (`png -> jpg`, ...). `ConversionRegistry`
-collects them at startup and is the single source of truth for `GET /formats`, upload validation and
-picking the converter. Two converters claiming the same route fail the startup.
-
-**Format detection by content.** The extension and MIME type are never trusted. A signature check
-(first bytes) rejects obvious fakes early; the real validation is done by ImageMagick itself, with the
-decoder forced by a `png:` prefix instead of letting it guess.
-
-**Storage keys.** Files are stored under 32 random hex characters. The user's file name is display
-data only and is sanitized (directory part, control characters, length). Any key that does not match
-the format is rejected before it can become a path.
-
-**Upload is streamed and counted.** The size limit is enforced while copying, not trusted from headers.
-On any failure after the file is saved, the file is deleted, so no orphan is left.
-
-**Access tokens: opaque, not JWT.** 32 random bytes; the client gets them once, the database stores
-only the SHA-256 hash. No salt or slow hash needed: the token is not guessable like a password.
-Not JWT because every request reads the job from the database anyway, and an opaque token can be
-revoked by deleting one row. No refresh token: the token lives exactly as long as the job's files.
-
-**Unknown job = 403, not 404.** A missing job and a wrong token give the same answer, so the API does
-not reveal which job ids exist.
-
-**202 Accepted** for job creation: the conversion happens later, in the worker. The response with the
-token is sent with `Cache-Control: no-store`.
-
-**One error format.** All errors are RFC 9457 `ProblemDetails` with an extra `code` field
-(`FILE_TOO_LARGE`, `ACCESS_DENIED`, ...). Expected errors are `AppException`; anything else becomes
-a generic 500 without details.
+**Rich domain entities.** Status changes only through methods (`StartProcessing`, `Complete`,
+`Cancel`, ...), and each method checks the current status. An invalid transition throws instead of
+silently corrupting data.
 
 **`IAppDbContext` instead of repositories.** The Application layer uses EF Core `DbSet`s through an
-interface. Trade-off: Application depends on EF Core, but avoids a repository layer that would only
-forward calls in a project of this size.
+interface. Cost: Application depends on EF Core. Gain: no repository layer that would only forward
+calls in a project of this size.
 
-**Queue in PostgreSQL, no broker.** The worker reserves the oldest `Pending` job with
-`SELECT ... FOR UPDATE SKIP LOCKED` and moves it to `Processing` in the same transaction. Several
-workers never take the same job. RabbitMQ/Redis would add a service without a real need here.
-The worker polls every 2 seconds when the queue is empty.
+## Jobs and queue
 
-**Scope per job.** The worker lives as long as the process, but each job gets a new DI scope and so
-a new `DbContext`, like one HTTP request in the API.
+**Queue in PostgreSQL, no message broker.** The worker reserves the oldest `Pending` job with
+`SELECT ... FOR UPDATE SKIP LOCKED` and marks it `Processing` in the same transaction, so several
+workers never take the same job. RabbitMQ or Redis would add a service without a real need here.
+Cost: the worker polls the table when the queue is empty.
 
-## Stage 3 — Security and recovery
+**Crash recovery.** A job that stays in `Processing` longer than `StuckJobTimeout` was abandoned by a
+crashed worker: it goes back to the queue, or fails after `MaxAttempts`. Conversion errors are not
+retried, because a broken file will not convert on the second try. The worker refuses to start if
+`StuckJobTimeout` is not well above the longest converter timeout; otherwise a slow conversion could
+be given to a second worker.
 
-**Cleanup service** (in the worker, at startup and every 5 minutes): deletes files of expired, failed
-and cancelled jobs, marks expired jobs `Expired` (rows are kept for statistics), deletes expired tokens
-and orphan files. The physical file is deleted first, the row second; a file that is in use keeps its
-row and is retried next run. `Processing` jobs are never touched.
+**Real cancellation.** `DELETE` on a running job only records a cancellation request and answers
+`202 Accepted`. The worker checks for it during the conversion, kills the container and deletes the
+files. The API never claims a job is deleted while a converter is still writing its files.
 
-**Orphan files** (on disk, no row) are deleted only if older than 1 hour, because an upload is written
-to disk a moment before its row is saved. Files whose names are not storage keys are never touched.
+**Cleanup.** Expired, failed and cancelled jobs lose their files; expired rows are kept for
+statistics. The file is deleted first and the row second, so a failure never leaves a file without a
+row. Files with no row are deleted only after an hour, because an upload is written to disk a moment
+before its row is saved.
 
-**Stuck jobs.** A job in `Processing` for more than 10 minutes means the worker crashed. It goes back
-to `Pending`, or to `Failed` after 3 attempts. Conversion errors are not retried: a broken file will
-not convert on the second try. On a normal shutdown the worker returns its current job immediately.
+## Security
 
-**Limits.**
-- Upload size is checked by a resource filter *before* ASP.NET Core reads the form (by
-  `Content-Length`), and the per-request body limit cuts off clients that do not announce the size.
-- Rate limit: 10 uploads per minute per client IP (fixed window), `429` with `Retry-After`.
-- Storage quota: new uploads get `503` when stored files exceed 1 GB. A soft limit: parallel uploads
-  may overshoot it slightly.
+**Access tokens: opaque, not JWT.** 32 random bytes, sent to the client once; the database stores only
+the SHA-256 hash. A JWT brings nothing here: every request reads the job from the database anyway,
+and an opaque token is revoked by deleting one row. No accounts: the token lives as long as the job.
 
-**`DELETE` never claims more than is done.** A job that is being converted is not deleted on the spot
-(see stage 4: it gets a cancellation request and `202 Accepted`). A job whose files are in use right
-now (e.g. being downloaded) gets `409`, and the client retries.
+**Unknown job = 403, not 404.** A missing job and a wrong token get the same answer, so the API does
+not reveal which job ids exist.
 
-**Converter sandbox.** ImageMagick runs in a one-off container per conversion
-(`converters/imagemagick`):
-- image: Alpine + ImageMagick, non-root user, the only entry point is `magick`;
-- `policy.xml`: only PNG/JPEG/WebP/BMP, no delegates (external programs), width/height/area/memory
-  limits that reject decompression bombs from the header;
-- `docker run`: `--network none`, `--read-only`, `/tmp` as a small tmpfs, memory/CPU/pids limits,
-  `--user 10001`, `--cap-drop ALL`, `no-new-privileges`;
-- the container sees only the input file (read-only) and an empty output folder;
-- on timeout the container is killed by name (killing the docker CLI alone would not stop it).
-All flags are built in one method covered by unit tests, so none can be dropped silently.
+**Format by content, never by extension.** A signature check rejects fakes early; the converter is then
+forced to use the detected decoder instead of guessing. The user's file name is display data only:
+files are stored under random keys.
 
-**Storage path.** `%LOCALAPPDATA%\FileForge` instead of the temp folder: on Windows the temp path may
-contain 8.3 short names that Docker cannot mount.
+**Limits.** Upload size is checked before the form is read and again while streaming; uploads are
+rate-limited per client IP; new uploads are refused when total storage exceeds a quota; FFmpeg output
+is capped, and a result truncated by the cap fails the job.
 
-## Stage 4 — Audio and video
+**One sandbox for every conversion.** Each conversion runs in a new container: no network, read-only
+file system, non-root user, no capabilities, memory/CPU/process/time limits. The container sees only
+its input file and an empty output folder. All `docker run` flags are built in one method covered by
+unit tests, so none can be dropped silently.
 
-**One sandbox, two converters.** The `docker run` logic lives in `DockerSandbox`; ImageMagick and
-FFmpeg only provide an image and tool arguments. Each converter has its own container limits
-(FFmpeg gets more memory, CPU and time).
+**Tool-specific hardening.** ImageMagick gets a `policy.xml` that allows only our four formats, no
+external programs and limited image dimensions, which rejects decompression bombs. FFmpeg has no
+policy file, so its restrictions are arguments: a forced input format and `-protocol_whitelist file`
+block crafted files that make it read other files or URLs.
 
-**FFmpeg has no policy file**, so its restrictions are arguments: a forced input demuxer (`-f`) and
-`-protocol_whitelist file`. Together they block known attacks where a crafted media file makes
-FFmpeg read other local files or URLs (e.g. a playlist hidden inside a video). Only the needed
-streams are mapped; subtitles, data streams and cover art are dropped.
+**The Docker socket lives in one small service.** Access to the socket is effectively root on the host.
+The worker has a database connection and handles every job, so it does not get it. The sandbox runner
+does: one endpoint, no database, no public port, reachable only from the worker. The worker sends only
+the route and storage keys, never paths or tool arguments, so even a compromised worker cannot start
+an arbitrary container.
 
-**Container is not codec.** Each target format gets a codec its players support: H.264 + AAC for
-MP4/MOV/MKV, VP9 + Opus for WebM, LAME for MP3, Vorbis for OGG. H.264 output is always `yuv420p`:
-other pixel formats are valid but most players cannot show them. Routes are audio-to-audio and
-video-to-video only. Note: x264 is GPL-licensed; FFmpeg runs as a separate program in its own image.
+## API and web interface
 
-**Format detection** covers all 13 formats by signature: ID3 tags and MPEG frame sync bits for MP3,
-ADTS sync for AAC, `ftyp` brand for MP4 vs MOV, the EBML DocType for MKV vs WebM.
+**One error format.** Errors are RFC 9457 `ProblemDetails` with a stable `code` field. The UI maps the
+code to its own message and never shows server text, so wording can change on either side.
 
-**Size limits follow one setting.** `Conversions:MaxFileSizeBytes` (200 MB) drives our filter and
-ASP.NET Core's multipart limit (128 MB by default, which would otherwise reject bigger uploads with
-a generic 400). The result is capped too: FFmpeg gets `-fs 1 GB`. When the cap is hit, FFmpeg exits
-successfully with a truncated file, so the converter also checks the size and fails the job.
+**Tokens stay in browser memory.** Never in the URL (history, logs) or `localStorage` (readable by any
+script on the page). Cost: reloading the page loses the job list. Because the token goes in a header,
+results are downloaded as a blob instead of a plain link.
 
-**Timeouts are checked at startup.** The worker refuses to start unless `StuckJobTimeout` is at least
-twice the longest converter timeout; otherwise a slow conversion could be handed to a second worker.
+**Same origin, no CORS.** nginx (and the Angular dev server in development) serves the app and proxies
+`/api`, so the browser talks to one site and the API needs no CORS configuration.
 
-**Real cancellation.** `DELETE` on a `Processing` job only records `CancellationRequestedAtUtc` and
-answers `202 Accepted`. While converting, the worker checks that field every 2 seconds (in a separate
-`DbContext`: a context must not be used by two tasks at once), kills the container, marks the job
-`Cancelled` and deletes its files. A request that arrives just as the conversion finishes still wins.
-A stuck job with a cancellation request is cancelled instead of retried.
+## Tests and deployment
+
+**Integration tests against a real PostgreSQL** (Testcontainers), because the queue relies on
+`FOR UPDATE SKIP LOCKED`, which an in-memory provider cannot check. Converters and time are replaced
+with test doubles, so the tests need no converter images and no waiting.
+
+**Migrations run once, before everything else.** A one-shot `migrate` service applies them and exits;
+the API and the worker start only after it succeeded. Two processes never migrate at the same time.
+
+**Three networks.** `frontend` (nginx, API), `backend` (API, worker, PostgreSQL) and `sandbox` (worker,
+runner). The last two have no route to the internet. Only nginx publishes a port, on `127.0.0.1` by
+default.
 
 ## Known limitations
 
-- **Docker access from the worker.** Whoever can start containers is effectively root on the host.
-  Fine while the worker runs on the developer machine; when the worker itself runs in Docker Compose,
-  the Docker socket must not simply be mounted into it. To be decided in stage 6 (e.g. a minimal
-  internal runner service).
+- **The sandbox runner holds the Docker socket.** Whoever takes it over controls the host. Rootless
+  Docker or a socket proxy that allows only the needed API calls would reduce this.
 - **Containers share the host kernel.** A kernel exploit could escape the sandbox. Stronger isolation
   (gVisor, microVMs) is out of scope.
-- **No optimistic concurrency.** `DELETE` of a `Pending` job can race with the worker reserving it,
-  and a cancellation request can arrive after the job has already completed (the job stays
-  `Completed`; a second `DELETE` removes it). A row version (PostgreSQL `xmin`) would close these gaps.
-- **Cancellation is polled**, so stopping takes up to a few seconds; LISTEN/NOTIFY could make it instant.
-- **Converter infrastructure failures** (Docker not running, image missing) mark the job `Failed`
-  instead of retrying it.
-- **Client IP behind a proxy.** The rate limiter uses the connection IP; forwarded headers must be
-  configured when a reverse proxy is added.
+- **No optimistic concurrency.** `DELETE` of a `Pending` job can race with the worker reserving it, and
+  a cancellation can arrive just after the job completed. A row version (PostgreSQL `xmin`) would
+  close these gaps.
+- **Cancellation is polled**, so stopping takes a few seconds; LISTEN/NOTIFY could make it instant.
+- **Infrastructure failures** (Docker down, image missing) fail the job instead of retrying it.
+- **Forwarded headers are trusted from any proxy.** Safe here, where only nginx reaches the API. If the
+  API were exposed directly, a client could fake its IP and bypass the rate limit.
+- **No HTTPS and no Content Security Policy.** Meant for `localhost` or a local network; a public
+  deployment needs TLS in front of nginx and a CSP header.
+- **Fonts come from Google Fonts**, so the UI makes third-party requests. Self-hosting them would fix it.
