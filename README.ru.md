@@ -176,4 +176,4 @@ xUnit, Testcontainers.
 
 ## Лицензия
 
-[MIT](LICENSE)
+[MIT](LICENSE.txt)

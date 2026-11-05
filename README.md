@@ -173,4 +173,4 @@ Third-party components and their licenses are listed in
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE.txt)
